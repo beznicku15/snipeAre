@@ -1,17 +1,17 @@
 --[[
-  Rozszerzony skrypt do Sniper Arena / podobnej gry.
-  Dodaje:
-  - zakładkę Loot z Auto Open i Find RemoteEvents
-  - wyszukiwanie RemoteEventów (wypisuje w konsoli)
-  - automatyczne klikanie przycisków "open" / wywoływanie RemoteEventów
+  Polo Sniper Arena - Improved UI + Loot Logic Scanner
+  Oryginalna struktura zachowana, dodano skanowanie RemoteEvent i wykrywanie logiki skrzynek.
 ]]
 
+-- Załaduj Rayfield
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
 
--- Konfiguracja UI (lekko odświeżona)
+-- Skonfiguruj UI z lepszymi kolorami
 Rayfield:SetConfiguration({
     Name = "Polo Sniper Arena",
-    Saving = {
+    LoadingTitle = "Only Best Cheats",
+    LoadingSubtitle = "by polo",
+    ConfigurationSaving = {
         Enabled = true,
         FolderName = "PoloSniperFinal",
         FileName = "BestCheatsConfig"
@@ -19,7 +19,7 @@ Rayfield:SetConfiguration({
     Theme = {
         Background = Color3.fromRGB(18, 18, 28),
         SecondaryBackground = Color3.fromRGB(28, 28, 44),
-        Accent = Color3.fromRGB(255, 120, 50),
+        Accent = Color3.fromRGB(255, 120, 50), -- pomarańczowy akcent
         Font = Enum.Font.GothamBold,
         TextColor = Color3.fromRGB(240, 240, 255),
         ButtonColor = Color3.fromRGB(60, 60, 90),
@@ -28,6 +28,7 @@ Rayfield:SetConfiguration({
     }
 })
 
+-- Główne okno
 local window = Rayfield:CreateWindow({
     Name = "Polo Sniper Arena",
     LoadingTitle = "Only Best Cheats",
@@ -39,7 +40,7 @@ local window = Rayfield:CreateWindow({
     }
 })
 
--- ===== Tabela stanów =====
+-- Tabela stanów (zachowana z oryginału)
 local v2 = {
     Aimbot = false,
     AimbotSmooth = 1,
@@ -59,18 +60,26 @@ local v2 = {
     Jump = false,
     JumpVal = 50,
     AutoStrafe = false,
-    AutoLoot = false,   -- NOWE
+    -- nowe
+    AutoLoot = false,
 }
 
--- ===== Zakładki =====
-local combatTab = window:CreateTab("⚔️ Combat")
-local visualsTab = window:CreateTab("👁️ Visuals")
-local weaponTab = window:CreateTab("🔧 Weapon")
-local movementTab = window:CreateTab("🏃 Movement")
-local lootTab = window:CreateTab("🎁 Loot")   -- NOWA
+-- Serwisy
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
 
--- ===== Elementy UI =====
--- Combat
+-- Tworzenie zakładek
+local combatTab = window:CreateTab("⚔️ Combat", 0)
+local visualsTab = window:CreateTab("👁️ Visuals", 0)
+local weaponTab = window:CreateTab("🔫 Weapon", 0)
+local movementTab = window:CreateTab("🏃 Movement", 0)
+local lootTab = window:CreateTab("📦 Loot", 0)
+
+--- Zakładka COMBAT
 combatTab:CreateToggle({
     Name = "Aimbot (Right Click)",
     CurrentValue = false,
@@ -95,13 +104,13 @@ combatTab:CreateToggle({
 })
 combatTab:CreateSlider({
     Name = "Hitbox Size",
-    Range = {1, 10},
+    Range = {1, 5},
     Increment = 1,
     CurrentValue = 2,
     Callback = function(v) v2.HitboxSize = v end
 })
 
--- Visuals
+--- Zakładka VISUALS
 visualsTab:CreateToggle({
     Name = "Enemy ESP (Box)",
     CurrentValue = false,
@@ -128,7 +137,7 @@ visualsTab:CreateToggle({
     Callback = function(v) v2.VisCheck = v end
 })
 
--- Weapon
+--- Zakładka WEAPON
 weaponTab:CreateToggle({
     Name = "No Recoil",
     CurrentValue = false,
@@ -145,7 +154,7 @@ weaponTab:CreateToggle({
     Callback = function(v) v2.FastReload = v end
 })
 
--- Movement
+--- Zakładka MOVEMENT
 movementTab:CreateLabel("⚠️ Speed Limit: Max 0.1 (CFrame)")
 movementTab:CreateToggle({
     Name = "CFrame Speed (Fix)",
@@ -177,7 +186,7 @@ movementTab:CreateToggle({
     Callback = function(v) v2.AutoStrafe = v end
 })
 
--- ===== NOWA zakładka Loot =====
+--- Zakładka LOOT - nowość
 lootTab:CreateToggle({
     Name = "Auto Open Crates",
     CurrentValue = false,
@@ -185,85 +194,153 @@ lootTab:CreateToggle({
 })
 
 lootTab:CreateButton({
-    Name = "Find RemoteEvents (Console)",
+    Name = "🔍 Scan for Loot Logic",
     Callback = function()
-        print("===== RemoteEvents / RemoteFunctions =====")
-        local found = 0
-        for _, obj in pairs(game:GetDescendants()) do
-            if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-                print(obj.ClassName, ":", obj.Name, "  (", obj.Parent:GetFullName(), ")")
-                found = found + 1
-            end
-        end
-        print("Znaleziono:", found)
-        Rayfield:Notify({
-            Title = "RemoteEvents",
-            Content = "Znaleziono " .. found .. " obiektów. Sprawdź konsolę (F9).",
-            Duration = 3
-        })
+        scanLootLogic()
     end
 })
 
--- ===== Funkcje pomocnicze =====
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local Camera = workspace.CurrentCamera
-local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
+lootTab:CreateButton({
+    Name = "📋 Show RemoteEvents in Console",
+    Callback = function()
+        print("📡 Lista RemoteEvent/RemoteFunction:")
+        for _, obj in pairs(game:GetDescendants()) do
+            if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+                print("  - " .. obj.Name .. " (rodzic: " .. (obj.Parent and obj.Parent.Name or "brak") .. ")")
+            end
+        end
+        Rayfield:Notify({Title = "RemoteEvents", Content = "Sprawdź konsolę (F9)", Duration = 3})
+    end
+})
 
--- Rysowanie linii (ESP)
-local function drawLine(from, to, color)
+-- Funkcja do skanowania logiki lootu
+function scanLootLogic()
+    local results = {}
+    local isClientSide = false
+    local isServerSide = false
+    local remoteEvents = {}
+
+    -- Znajdź RemoteEventy związane z otwieraniem
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+            local name = obj.Name:lower()
+            if name:find("loot") or name:find("crate") or name:find("chest") or name:find("open") or name:find("reward") then
+                table.insert(remoteEvents, obj)
+            end
+        end
+    end
+
+    -- Sprawdź, czy istnieją lokalne skrypty, które mogą obsługiwać otwieranie
+    local localScripts = {}
+    local places = {game:GetService("StarterGui"), game:GetService("StarterPlayer").StarterPlayerScripts, game:GetService("StarterPack")}
+    for _, place in pairs(places) do
+        if place then
+            for _, script in pairs(place:GetDescendants()) do
+                if script:IsA("LocalScript") or script:IsA("ModuleScript") then
+                    table.insert(localScripts, script)
+                end
+            end
+        end
+    end
+
+    -- Sprawdź, czy w którymś skrypcie jest wzmianka o `math.random` lub `Random`
+    for _, script in pairs(localScripts) do
+        if script:IsA("LocalScript") and script.Name:lower():find("loot") or script.Name:lower():find("crate") then
+            -- Jeśli istnieje skrypt o nazwie kojarzącej się z lootem, to prawdopodobnie logika jest po stronie klienta
+            isClientSide = true
+            table.insert(results, "🔍 Znaleziono lokalny skrypt: " .. script.Name .. " (prawdopodobnie logika po stronie klienta)")
+        end
+    end
+
+    -- Jeśli są RemoteEventy, to logika może być po stronie serwera (ale nie musi – klient też może je wywoływać)
+    if #remoteEvents > 0 then
+        isServerSide = true
+        table.insert(results, "📡 Znaleziono " .. #remoteEvents .. " RemoteEvent/ów powiązanych z lootem.")
+        for _, ev in pairs(remoteEvents) do
+            table.insert(results, "   - " .. ev.Name .. " (rodzic: " .. (ev.Parent and ev.Parent.Name or "brak") .. ")")
+        end
+    else
+        table.insert(results, "❌ Nie znaleziono RemoteEventów powiązanych z lootem.")
+    end
+
+    -- Podsumowanie
+    if isClientSide and isServerSide then
+        table.insert(results, "⚠️ Logika może być po stronie KLIENTA i SERWERA – sprawdź, które wartości są zmieniane lokalnie.")
+    elseif isClientSide then
+        table.insert(results, "✅ Logika lootu jest najprawdopodobniej po stronie KLIENTA – możesz modyfikować szanse!")
+    elseif isServerSide then
+        table.insert(results, "❌ Logika lootu jest po stronie SERWERA – nie możesz zmienić szans, ale możesz automatyzować otwieranie.")
+    else
+        table.insert(results, "❓ Nie udało się jednoznacznie określić – spróbuj przeanalizować skrypty ręcznie.")
+    end
+
+    -- Wyświetl wyniki w GUI (notyfikacja)
+    local msg = table.concat(results, "\n")
+    Rayfield:Notify({
+        Title = "🔎 Wyniki skanowania",
+        Content = msg,
+        Duration = 8
+    })
+
+    -- Wypisz też do konsoli
+    print("=== WYNIKI SKANOWANIA LOOTU ===")
+    for _, line in pairs(results) do
+        print(line)
+    end
+    print("=================================")
+end
+
+-- Funkcje pomocnicze (z oryginału)
+local function createLine(from, to, color)
     local line = Drawing.new("Line")
     line.Visible = true
-    line.From = from
-    line.To = to
     line.Color = color or Color3.fromRGB(255, 255, 255)
     line.Thickness = 1
+    line.From = from
+    line.To = to
     return line
 end
 
--- Znajdź najbliższego wroga
-local function getClosestEnemy()
-    local bestDist = math.huge
-    local bestTarget = nil
+local drawings = {}
+
+local function getClosestTarget()
+    local closest = nil
+    local minDist = math.huge
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
-            local visible = true
+            local isVisible = true
             if v2.VisCheck then
                 local parts = Camera:GetPartsObscuringTarget({player.Character.Head.Position}, {LocalPlayer.Character, player.Character})
-                if #parts > 0 then visible = false end
+                if #parts > 0 then isVisible = false end
             end
-            if visible then
-                local pos, onScreen = Camera:WorldToViewportPoint(player.Character.Head.Position)
+            if isVisible then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(player.Character.Head.Position)
                 if onScreen then
-                    local dist = (Vector2.new(pos.X, pos.Y) - UserInputService:GetMouseLocation()).Magnitude
-                    if dist < bestDist then
-                        bestDist = dist
-                        bestTarget = player
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - UserInputService:GetMouseLocation()).Magnitude
+                    if dist < minDist then
+                        minDist = dist
+                        closest = player
                     end
                 end
             end
         end
     end
-    return bestTarget
+    return closest
 end
 
--- Modyfikacja broni
-local function modifyWeapon()
+local function modifyWeaponStats()
     pcall(function()
         local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
         if tool then
             for _, child in pairs(tool:GetDescendants()) do
                 if child:IsA("NumberValue") or child:IsA("DoubleConstrainedValue") or child:IsA("IntValue") then
-                    local name = child.Name:lower()
-                    if v2.NoRecoil and (name:find("recoil") or name:find("kick")) then
+                    if v2.NoRecoil and (child.Name:lower():find("recoil") or child.Name:lower():find("kick")) then
                         child.Value = 0
                     end
-                    if v2.NoSpread and (name:find("spread") or name:find("accuracy")) then
+                    if v2.NoSpread and (child.Name:lower():find("spread") or child.Name:lower():find("accuracy")) then
                         child.Value = 0
                     end
-                    if v2.FastReload and (name:find("reload") or name:find("time")) then
+                    if v2.FastReload and (child.Name:lower():find("reload") or child.Name:lower():find("time")) then
                         child.Value = 0.05
                     end
                 end
@@ -272,24 +349,26 @@ local function modifyWeapon()
     end)
 end
 
--- ===== Główna pętla =====
-local drawings = {}
-
+-- Główna pętla
 RunService.RenderStepped:Connect(function()
-    -- Czyść rysunki
-    for _, d in pairs(drawings) do d:Remove() end
+    -- Usuń stare rysunki
+    for _, line in pairs(drawings) do
+        line:Remove()
+    end
     drawings = {}
 
     -- Speed
     if v2.Speed and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
-        local rootPart = LocalPlayer.Character.HumanoidRootPart
-        if humanoid and rootPart and humanoid.MoveDirection.Magnitude > 0 then
-            rootPart.CFrame = rootPart.CFrame + (humanoid.MoveDirection * v2.SpeedVal)
+        local root = LocalPlayer.Character.HumanoidRootPart
+        if humanoid and root then
+            if humanoid.MoveDirection.Magnitude > 0 then
+                root.CFrame = root.CFrame + (humanoid.MoveDirection * v2.SpeedVal)
+            end
         end
     end
 
-    -- Jump i AutoStrafe
+    -- Jump, AutoStrafe
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
         local humanoid = LocalPlayer.Character.Humanoid
         if v2.Jump then
@@ -302,52 +381,57 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- ESP i Hitbox dla przeciwników
+    -- ESP
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("HumanoidRootPart") then
             local char = player.Character
             local head = char.Head
             local root = char.HumanoidRootPart
-            local espObj = char:FindFirstChild("PoloESP")
 
-            -- Box
+            -- Highlight (Box ESP)
+            local highlight = char:FindFirstChild("PoloESP")
             if v2.ESP_Box then
-                if not espObj then
-                    espObj = Instance.new("Highlight", char)
-                    espObj.Name = "PoloESP"
-                    espObj.FillColor = Color3.fromRGB(255, 0, 0)
-                    espObj.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    espObj.FillTransparency = 0.5
+                if not highlight then
+                    highlight = Instance.new("Highlight", char)
+                    highlight.Name = "PoloESP"
+                    highlight.FillColor = Color3.fromRGB(255, 0, 0)
+                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    highlight.FillTransparency = 0.5
                 end
-            elseif espObj then
-                espObj:Destroy()
+            else
+                if highlight then highlight:Destroy() end
             end
 
             -- Skeleton
             if v2.ESP_Skeleton then
-                local function drawBone(a, b)
+                local function drawLine(a, b)
                     if a and b then
-                        local p1, v1 = Camera:WorldToViewportPoint(a.Position)
-                        local p2, v2 = Camera:WorldToViewportPoint(b.Position)
-                        if v1 and v2 then
-                            table.insert(drawings, drawLine(Vector2.new(p1.X, p1.Y), Vector2.new(p2.X, p2.Y)))
+                        local posA, visA = Camera:WorldToViewportPoint(a.Position)
+                        local posB, visB = Camera:WorldToViewportPoint(b.Position)
+                        if visA and visB then
+                            local line = createLine(Vector2.new(posA.X, posA.Y), Vector2.new(posB.X, posB.Y))
+                            table.insert(drawings, line)
                         end
                     end
                 end
-                drawBone(head, char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"))
-                drawBone(char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"), char:FindFirstChild("LowerTorso"))
+                drawLine(head, char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"))
+                drawLine(char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"), char:FindFirstChild("LowerTorso"))
             end
 
             -- Tracer
             if v2.ESP_Line then
                 local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
                 if onScreen then
-                    local bottom = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-                    table.insert(drawings, drawLine(bottom, Vector2.new(pos.X, pos.Y), Color3.fromRGB(255, 0, 0)))
+                    local line = createLine(
+                        Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y),
+                        Vector2.new(pos.X, pos.Y),
+                        Color3.fromRGB(255, 0, 0)
+                    )
+                    table.insert(drawings, line)
                 end
             end
 
-            -- Hitbox (Big Head)
+            -- Hitbox
             if v2.Hitbox then
                 head.Size = Vector3.new(v2.HitboxSize, v2.HitboxSize, v2.HitboxSize)
                 head.Transparency = 0.5
@@ -358,7 +442,7 @@ RunService.RenderStepped:Connect(function()
 
     -- Aimbot
     if v2.Aimbot and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-        local target = getClosestEnemy()
+        local target = getClosestTarget()
         if target then
             local pos, onScreen = Camera:WorldToViewportPoint(target.Character.Head.Position)
             if onScreen then
@@ -378,32 +462,31 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Modyfikacja broni
+    -- Weapon stats mod
     if v2.NoRecoil or v2.NoSpread or v2.FastReload then
-        modifyWeapon()
+        modifyWeaponStats()
     end
 
-    -- ===== NOWA funkcja: Auto Loot =====
+    -- Auto Loot (nowość)
     if v2.AutoLoot then
-        -- 1. Szukamy przycisków "Open" / "Otwórz" i klikamy
+        -- Szukamy przycisków do otwierania
         for _, obj in pairs(game:GetDescendants()) do
-            if obj:IsA("TextButton") and obj.Visible and obj.Active then
+            if obj:IsA("TextButton") then
                 local name = obj.Name:lower()
-                if name:find("open") or name:find("otwórz") or name:find("crate") or name:find("skrzyn") then
+                if name:find("open") or name:find("otwórz") or name:find("crate") or name:find("loot") then
                     pcall(function()
                         obj:Click()
                     end)
                 end
             end
         end
-
-        -- 2. Szukamy RemoteEventów o nazwach związanych z otwieraniem i wywołujemy
+        -- Próba wywołania RemoteEvent (jeśli znaleziony)
         for _, obj in pairs(game:GetDescendants()) do
             if obj:IsA("RemoteEvent") then
                 local name = obj.Name:lower()
-                if name:find("open") or name:find("loot") or name:find("crate") or name:find("skrzyn") then
+                if name:find("open") or name:find("loot") or name:find("crate") then
                     pcall(function()
-                        obj:FireServer()  -- lub z argumentami, ale nie znamy ich
+                        obj:FireServer() -- bez argumentów, może nie działać
                     end)
                 end
             end
@@ -411,7 +494,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- ===== Powiadomienie o załadowaniu =====
+-- Powiadomienie o starcie
 Rayfield:Notify({
     Title = "Polo Sniper Arena",
     Content = "Only Best Cheats Loaded!",
