@@ -1,0 +1,419 @@
+--[[
+  Rozszerzony skrypt do Sniper Arena / podobnej gry.
+  Dodaje:
+  - zakładkę Loot z Auto Open i Find RemoteEvents
+  - wyszukiwanie RemoteEventów (wypisuje w konsoli)
+  - automatyczne klikanie przycisków "open" / wywoływanie RemoteEventów
+]]
+
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+-- Konfiguracja UI (lekko odświeżona)
+Rayfield:SetConfiguration({
+    Name = "Polo Sniper Arena",
+    Saving = {
+        Enabled = true,
+        FolderName = "PoloSniperFinal",
+        FileName = "BestCheatsConfig"
+    },
+    Theme = {
+        Background = Color3.fromRGB(18, 18, 28),
+        SecondaryBackground = Color3.fromRGB(28, 28, 44),
+        Accent = Color3.fromRGB(255, 120, 50),
+        Font = Enum.Font.GothamBold,
+        TextColor = Color3.fromRGB(240, 240, 255),
+        ButtonColor = Color3.fromRGB(60, 60, 90),
+        ButtonHover = Color3.fromRGB(80, 80, 120),
+        Border = Color3.fromRGB(50, 50, 70)
+    }
+})
+
+local window = Rayfield:CreateWindow({
+    Name = "Polo Sniper Arena",
+    LoadingTitle = "Only Best Cheats",
+    LoadingSubtitle = "by polo",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "PoloSniperFinal",
+        FileName = "BestCheatsConfig"
+    }
+})
+
+-- ===== Tabela stanów =====
+local v2 = {
+    Aimbot = false,
+    AimbotSmooth = 1,
+    TriggerBot = false,
+    Hitbox = false,
+    HitboxSize = 2,
+    ESP_Box = false,
+    ESP_Skeleton = false,
+    ESP_Line = false,
+    ESP_Distance = false,
+    VisCheck = false,
+    NoRecoil = false,
+    NoSpread = false,
+    FastReload = false,
+    Speed = false,
+    SpeedVal = 0.05,
+    Jump = false,
+    JumpVal = 50,
+    AutoStrafe = false,
+    AutoLoot = false,   -- NOWE
+}
+
+-- ===== Zakładki =====
+local combatTab = window:CreateTab("⚔️ Combat")
+local visualsTab = window:CreateTab("👁️ Visuals")
+local weaponTab = window:CreateTab("🔧 Weapon")
+local movementTab = window:CreateTab("🏃 Movement")
+local lootTab = window:CreateTab("🎁 Loot")   -- NOWA
+
+-- ===== Elementy UI =====
+-- Combat
+combatTab:CreateToggle({
+    Name = "Aimbot (Right Click)",
+    CurrentValue = false,
+    Callback = function(v) v2.Aimbot = v end
+})
+combatTab:CreateSlider({
+    Name = "Aimbot Smoothness",
+    Range = {1, 10},
+    Increment = 1,
+    CurrentValue = 1,
+    Callback = function(v) v2.AimbotSmooth = v end
+})
+combatTab:CreateToggle({
+    Name = "Trigger Assist (Auto Fire)",
+    CurrentValue = false,
+    Callback = function(v) v2.TriggerBot = v end
+})
+combatTab:CreateToggle({
+    Name = "Hitbox Expand (Big Head)",
+    CurrentValue = false,
+    Callback = function(v) v2.Hitbox = v end
+})
+combatTab:CreateSlider({
+    Name = "Hitbox Size",
+    Range = {1, 10},
+    Increment = 1,
+    CurrentValue = 2,
+    Callback = function(v) v2.HitboxSize = v end
+})
+
+-- Visuals
+visualsTab:CreateToggle({
+    Name = "Enemy ESP (Box)",
+    CurrentValue = false,
+    Callback = function(v) v2.ESP_Box = v end
+})
+visualsTab:CreateToggle({
+    Name = "Skeleton ESP",
+    CurrentValue = false,
+    Callback = function(v) v2.ESP_Skeleton = v end
+})
+visualsTab:CreateToggle({
+    Name = "Tracer ESP (Lines)",
+    CurrentValue = false,
+    Callback = function(v) v2.ESP_Line = v end
+})
+visualsTab:CreateToggle({
+    Name = "Distance ESP",
+    CurrentValue = false,
+    Callback = function(v) v2.ESP_Distance = v end
+})
+visualsTab:CreateToggle({
+    Name = "Visible Check",
+    CurrentValue = false,
+    Callback = function(v) v2.VisCheck = v end
+})
+
+-- Weapon
+weaponTab:CreateToggle({
+    Name = "No Recoil",
+    CurrentValue = false,
+    Callback = function(v) v2.NoRecoil = v end
+})
+weaponTab:CreateToggle({
+    Name = "No Spread",
+    CurrentValue = false,
+    Callback = function(v) v2.NoSpread = v end
+})
+weaponTab:CreateToggle({
+    Name = "Fast Reload",
+    CurrentValue = false,
+    Callback = function(v) v2.FastReload = v end
+})
+
+-- Movement
+movementTab:CreateLabel("⚠️ Speed Limit: Max 0.1 (CFrame)")
+movementTab:CreateToggle({
+    Name = "CFrame Speed (Fix)",
+    CurrentValue = false,
+    Callback = function(v) v2.Speed = v end
+})
+movementTab:CreateSlider({
+    Name = "Speed Value",
+    Range = {0.01, 0.1},
+    Increment = 0.01,
+    CurrentValue = 0.05,
+    Callback = function(v) v2.SpeedVal = v end
+})
+movementTab:CreateToggle({
+    Name = "Jump Boost",
+    CurrentValue = false,
+    Callback = function(v) v2.Jump = v end
+})
+movementTab:CreateSlider({
+    Name = "Jump Power",
+    Range = {50, 90},
+    Increment = 1,
+    CurrentValue = 50,
+    Callback = function(v) v2.JumpVal = v end
+})
+movementTab:CreateToggle({
+    Name = "Auto Strafe",
+    CurrentValue = false,
+    Callback = function(v) v2.AutoStrafe = v end
+})
+
+-- ===== NOWA zakładka Loot =====
+lootTab:CreateToggle({
+    Name = "Auto Open Crates",
+    CurrentValue = false,
+    Callback = function(v) v2.AutoLoot = v end
+})
+
+lootTab:CreateButton({
+    Name = "Find RemoteEvents (Console)",
+    Callback = function()
+        print("===== RemoteEvents / RemoteFunctions =====")
+        local found = 0
+        for _, obj in pairs(game:GetDescendants()) do
+            if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+                print(obj.ClassName, ":", obj.Name, "  (", obj.Parent:GetFullName(), ")")
+                found = found + 1
+            end
+        end
+        print("Znaleziono:", found)
+        Rayfield:Notify({
+            Title = "RemoteEvents",
+            Content = "Znaleziono " .. found .. " obiektów. Sprawdź konsolę (F9).",
+            Duration = 3
+        })
+    end
+})
+
+-- ===== Funkcje pomocnicze =====
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+
+-- Rysowanie linii (ESP)
+local function drawLine(from, to, color)
+    local line = Drawing.new("Line")
+    line.Visible = true
+    line.From = from
+    line.To = to
+    line.Color = color or Color3.fromRGB(255, 255, 255)
+    line.Thickness = 1
+    return line
+end
+
+-- Znajdź najbliższego wroga
+local function getClosestEnemy()
+    local bestDist = math.huge
+    local bestTarget = nil
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
+            local visible = true
+            if v2.VisCheck then
+                local parts = Camera:GetPartsObscuringTarget({player.Character.Head.Position}, {LocalPlayer.Character, player.Character})
+                if #parts > 0 then visible = false end
+            end
+            if visible then
+                local pos, onScreen = Camera:WorldToViewportPoint(player.Character.Head.Position)
+                if onScreen then
+                    local dist = (Vector2.new(pos.X, pos.Y) - UserInputService:GetMouseLocation()).Magnitude
+                    if dist < bestDist then
+                        bestDist = dist
+                        bestTarget = player
+                    end
+                end
+            end
+        end
+    end
+    return bestTarget
+end
+
+-- Modyfikacja broni
+local function modifyWeapon()
+    pcall(function()
+        local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+        if tool then
+            for _, child in pairs(tool:GetDescendants()) do
+                if child:IsA("NumberValue") or child:IsA("DoubleConstrainedValue") or child:IsA("IntValue") then
+                    local name = child.Name:lower()
+                    if v2.NoRecoil and (name:find("recoil") or name:find("kick")) then
+                        child.Value = 0
+                    end
+                    if v2.NoSpread and (name:find("spread") or name:find("accuracy")) then
+                        child.Value = 0
+                    end
+                    if v2.FastReload and (name:find("reload") or name:find("time")) then
+                        child.Value = 0.05
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- ===== Główna pętla =====
+local drawings = {}
+
+RunService.RenderStepped:Connect(function()
+    -- Czyść rysunki
+    for _, d in pairs(drawings) do d:Remove() end
+    drawings = {}
+
+    -- Speed
+    if v2.Speed and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+        local rootPart = LocalPlayer.Character.HumanoidRootPart
+        if humanoid and rootPart and humanoid.MoveDirection.Magnitude > 0 then
+            rootPart.CFrame = rootPart.CFrame + (humanoid.MoveDirection * v2.SpeedVal)
+        end
+    end
+
+    -- Jump i AutoStrafe
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        local humanoid = LocalPlayer.Character.Humanoid
+        if v2.Jump then
+            humanoid.UseJumpPower = true
+            humanoid.JumpPower = v2.JumpVal
+        end
+        if v2.AutoStrafe and humanoid.MoveDirection.Magnitude > 0 then
+            local vel = LocalPlayer.Character.HumanoidRootPart.Velocity
+            LocalPlayer.Character.HumanoidRootPart.Velocity = Vector3.new(vel.X * 1.01, vel.Y, vel.Z * 1.01)
+        end
+    end
+
+    -- ESP i Hitbox dla przeciwników
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("HumanoidRootPart") then
+            local char = player.Character
+            local head = char.Head
+            local root = char.HumanoidRootPart
+            local espObj = char:FindFirstChild("PoloESP")
+
+            -- Box
+            if v2.ESP_Box then
+                if not espObj then
+                    espObj = Instance.new("Highlight", char)
+                    espObj.Name = "PoloESP"
+                    espObj.FillColor = Color3.fromRGB(255, 0, 0)
+                    espObj.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    espObj.FillTransparency = 0.5
+                end
+            elseif espObj then
+                espObj:Destroy()
+            end
+
+            -- Skeleton
+            if v2.ESP_Skeleton then
+                local function drawBone(a, b)
+                    if a and b then
+                        local p1, v1 = Camera:WorldToViewportPoint(a.Position)
+                        local p2, v2 = Camera:WorldToViewportPoint(b.Position)
+                        if v1 and v2 then
+                            table.insert(drawings, drawLine(Vector2.new(p1.X, p1.Y), Vector2.new(p2.X, p2.Y)))
+                        end
+                    end
+                end
+                drawBone(head, char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"))
+                drawBone(char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"), char:FindFirstChild("LowerTorso"))
+            end
+
+            -- Tracer
+            if v2.ESP_Line then
+                local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
+                if onScreen then
+                    local bottom = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                    table.insert(drawings, drawLine(bottom, Vector2.new(pos.X, pos.Y), Color3.fromRGB(255, 0, 0)))
+                end
+            end
+
+            -- Hitbox (Big Head)
+            if v2.Hitbox then
+                head.Size = Vector3.new(v2.HitboxSize, v2.HitboxSize, v2.HitboxSize)
+                head.Transparency = 0.5
+                head.CanCollide = false
+            end
+        end
+    end
+
+    -- Aimbot
+    if v2.Aimbot and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+        local target = getClosestEnemy()
+        if target then
+            local pos, onScreen = Camera:WorldToViewportPoint(target.Character.Head.Position)
+            if onScreen then
+                local mousePos = UserInputService:GetMouseLocation()
+                local dx = pos.X - mousePos.X
+                local dy = pos.Y - mousePos.Y
+                mousemoverel(dx / v2.AimbotSmooth, dy / v2.AimbotSmooth)
+            end
+        end
+    end
+
+    -- TriggerBot
+    if v2.TriggerBot then
+        local target = Mouse.Target
+        if target and target.Parent and target.Parent:FindFirstChild("Humanoid") then
+            mouse1click()
+        end
+    end
+
+    -- Modyfikacja broni
+    if v2.NoRecoil or v2.NoSpread or v2.FastReload then
+        modifyWeapon()
+    end
+
+    -- ===== NOWA funkcja: Auto Loot =====
+    if v2.AutoLoot then
+        -- 1. Szukamy przycisków "Open" / "Otwórz" i klikamy
+        for _, obj in pairs(game:GetDescendants()) do
+            if obj:IsA("TextButton") and obj.Visible and obj.Active then
+                local name = obj.Name:lower()
+                if name:find("open") or name:find("otwórz") or name:find("crate") or name:find("skrzyn") then
+                    pcall(function()
+                        obj:Click()
+                    end)
+                end
+            end
+        end
+
+        -- 2. Szukamy RemoteEventów o nazwach związanych z otwieraniem i wywołujemy
+        for _, obj in pairs(game:GetDescendants()) do
+            if obj:IsA("RemoteEvent") then
+                local name = obj.Name:lower()
+                if name:find("open") or name:find("loot") or name:find("crate") or name:find("skrzyn") then
+                    pcall(function()
+                        obj:FireServer()  -- lub z argumentami, ale nie znamy ich
+                    end)
+                end
+            end
+        end
+    end
+end)
+
+-- ===== Powiadomienie o załadowaniu =====
+Rayfield:Notify({
+    Title = "Polo Sniper Arena",
+    Content = "Only Best Cheats Loaded!",
+    Duration = 5
+})
