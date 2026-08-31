@@ -1,29 +1,8 @@
 --[[
-  Polo Sniper Arena – Ulepszona wersja
-  Funkcje: Aimbot, ESP, No Recoil, Speed, Jump, Auto Loot, Skaner RemoteEvent
+  Polo Sniper Arena – Ulepszona wersja (bez SetConfiguration)
 ]]
 
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
-
--- Konfiguracja UI (zmiana kolorów, czcionki)
-Rayfield:SetConfiguration({
-    Name = "Polo Sniper Arena",
-    Saving = {
-        Enabled = true,
-        FolderName = "PoloSniperFinal",
-        FileName = "BestCheatsConfig"
-    },
-    Theme = {
-        Background = Color3.fromRGB(18, 18, 28),
-        SecondaryBackground = Color3.fromRGB(28, 28, 44),
-        Accent = Color3.fromRGB(255, 120, 50),
-        Font = Enum.Font.GothamBold,
-        TextColor = Color3.fromRGB(240, 240, 255),
-        ButtonColor = Color3.fromRGB(60, 60, 90),
-        ButtonHover = Color3.fromRGB(80, 80, 120),
-        Border = Color3.fromRGB(50, 50, 70)
-    }
-})
 
 local window = Rayfield:CreateWindow({
     Name = "Polo Sniper Arena",
@@ -57,7 +36,7 @@ local v2 = {
     JumpVal = 50,
     AutoStrafe = false,
     AutoLoot = false,
-    LootMethod = "Click" -- "Click" lub "Remote"
+    LootMethod = "Click"
 }
 
 -- Zakładki
@@ -203,7 +182,6 @@ lootTab:CreateButton({
     Callback = function()
         print("🔍 Sprawdzanie logiki skrzynek...")
         local found = false
-        -- Przeszukaj wszystkie skrypty klienckie (StarterPlayerScripts, StarterGui, itp.)
         local clientScripts = {
             game:GetService("StarterPlayer"):GetChildren(),
             game:GetService("StarterGui"):GetChildren(),
@@ -230,9 +208,7 @@ lootTab:CreateButton({
     end
 })
 
--- Reszta skryptu (funkcje pomocnicze, pętla) – wierna kopia z działającej wersji,
--- ale z dodanym Auto Loot i zabezpieczeniami.
-
+-- Reszta skryptu (funkcje pomocnicze, pętla)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -240,7 +216,6 @@ local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 
--- Funkcja rysująca linię (zabezpieczona)
 local function DrawLine(from, to, color)
     local line = Drawing.new("Line")
     line.Visible = true
@@ -251,7 +226,6 @@ local function DrawLine(from, to, color)
     return line
 end
 
--- Funkcja znajdująca najbliższego wroga
 local function GetClosestEnemy()
     local closest, dist = nil, math.huge
     for _, player in pairs(Players:GetPlayers()) do
@@ -279,7 +253,6 @@ local function GetClosestEnemy()
     return closest
 end
 
--- Funkcja modyfikująca broń (No Recoil, No Spread, Fast Reload)
 local function ModifyWeapon()
     pcall(function()
         local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
@@ -302,18 +275,14 @@ local function ModifyWeapon()
     end)
 end
 
--- Pamięć rysunków
 local drawings = {}
 
--- Główna pętla
 RunService.RenderStepped:Connect(function()
-    -- Czyszczenie rysunków
     for _, draw in pairs(drawings) do
         draw:Remove()
     end
     drawings = {}
 
-    -- Speed
     if v2.Speed and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
         local root = LocalPlayer.Character.HumanoidRootPart
@@ -324,7 +293,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Jump, AutoStrafe
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
         local humanoid = LocalPlayer.Character.Humanoid
         if v2.Jump then
@@ -337,14 +305,12 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- ESP dla każdego gracza
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("HumanoidRootPart") then
             local char = player.Character
             local head = char.Head
             local root = char.HumanoidRootPart
 
-            -- Box ESP
             if v2.ESP_Box then
                 local hl = char:FindFirstChild("PoloESP")
                 if not hl then
@@ -359,7 +325,6 @@ RunService.RenderStepped:Connect(function()
                 if hl then hl:Destroy() end
             end
 
-            -- Skeleton ESP
             if v2.ESP_Skeleton then
                 local function drawLine(joint1, joint2)
                     if joint1 and joint2 then
@@ -375,7 +340,6 @@ RunService.RenderStepped:Connect(function()
                 drawLine(char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"), char:FindFirstChild("LowerTorso"))
             end
 
-            -- Tracer ESP
             if v2.ESP_Line then
                 local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
                 if onScreen then
@@ -388,7 +352,6 @@ RunService.RenderStepped:Connect(function()
                 end
             end
 
-            -- Hitbox
             if v2.Hitbox then
                 head.Size = Vector3.new(v2.HitboxSize, v2.HitboxSize, v2.HitboxSize)
                 head.Transparency = 0.5
@@ -397,7 +360,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Aimbot
     if v2.Aimbot and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
         local target = GetClosestEnemy()
         if target then
@@ -411,7 +373,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- TriggerBot
     if v2.TriggerBot then
         local target = Mouse.Target
         if target and target.Parent and target.Parent:FindFirstChild("Humanoid") then
@@ -419,16 +380,13 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Modyfikacja broni
     if v2.NoRecoil or v2.NoSpread or v2.FastReload then
         ModifyWeapon()
     end
 
-    -- AUTO LOOT (nowa funkcja)
     if v2.AutoLoot then
         pcall(function()
             if v2.LootMethod == "Click" then
-                -- Szukamy przycisków "Otwórz"
                 for _, obj in pairs(game:GetDescendants()) do
                     if obj:IsA("TextButton") then
                         local name = obj.Name:lower()
@@ -438,7 +396,6 @@ RunService.RenderStepped:Connect(function()
                     end
                 end
             elseif v2.LootMethod == "Remote" then
-                -- Szukamy RemoteEvent o nazwie zawierającej "open" lub "crate"
                 for _, obj in pairs(game:GetDescendants()) do
                     if obj:IsA("RemoteEvent") then
                         local name = obj.Name:lower()
@@ -452,7 +409,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Powiadomienie
 Rayfield:Notify({
     Title = "Polo Sniper Arena",
     Content = "Cheaty załadowane!",
