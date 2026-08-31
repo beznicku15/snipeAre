@@ -1,13 +1,126 @@
 --[[
-  Polo Sniper Arena – Ulepszona wersja (bez SetConfiguration)
+  Polo Sniper Arena – Ulepszona wersja z logowaniem do pliku
+  Funkcje: Aimbot, ESP, No Recoil, Speed, Jump, Auto Loot, Skaner RemoteEvent, Zapis logów
 ]]
 
-local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+-- ==================== SYSTEM ZAPISU LOGÓW ====================
+local logBuffer = {}
+local logFile = "logs.txt" -- nazwa pliku (w folderze executora)
 
+-- Funkcja dodająca wpis do bufora i zapisująca do pliku (jeśli możliwe)
+local function addLog(text, level)
+    level = level or "INFO"
+    local timestamp = os.date("%Y-%m-%d %H:%M:%S")
+    local entry = string.format("[%s] [%s] %s", timestamp, level, tostring(text))
+    table.insert(logBuffer, entry)
+    -- Jeśli bufor przekroczy 50 wpisów, zapisz automatycznie
+    if #logBuffer >= 50 then
+        saveLogs()
+    end
+end
+
+-- Funkcja zapisująca cały bufor do pliku
+local function saveLogs()
+    if #logBuffer == 0 then return end
+    local success, err = pcall(function()
+        local content = table.concat(logBuffer, "\n") .. "\n"
+        if writefile then
+            -- Dopisujemy do istniejącego pliku
+            local existing = readfile and readfile(logFile) or ""
+            writefile(logFile, existing .. content)
+        elseif game:GetService("HttpService") then
+            -- Jeśli brak writefile, wyślij na serwer (opcjonalnie)
+            -- Tu możesz dodać wysyłkę na swój serwer
+            print("Brak writefile – logi tylko w konsoli")
+        end
+        logBuffer = {}
+    end)
+    if not success then
+        warn("Nie udało się zapisać logów:", err)
+    end
+end
+
+-- Nadpisanie globalnych funkcji print/warn/error, aby logowały
+local oldPrint = print
+local oldWarn = warn
+local oldError = error
+
+print = function(...)
+    local args = {...}
+    local msg = table.concat(args, " ")
+    addLog(msg, "INFO")
+    oldPrint(...)
+end
+
+warn = function(...)
+    local args = {...}
+    local msg = table.concat(args, " ")
+    addLog(msg, "WARN")
+    oldWarn(...)
+end
+
+error = function(...)
+    local args = {...}
+    local msg = table.concat(args, " ")
+    addLog(msg, "ERROR")
+    oldError(...)
+end
+
+-- Automatyczne zapisywanie logów co 30 sekund
+task.spawn(function()
+    while true do
+        task.wait(30)
+        saveLogs()
+    end
+end)
+
+-- ==================== ŁADOWANIE RAYFIELD ====================
+local RayfieldLoaded, Rayfield = pcall(function()
+    return loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+end)
+
+if not RayfieldLoaded or not Rayfield then
+    warn("Nie udało się załadować Rayfield z głównego źródła. Próbuję alternatywnego...")
+    local success, result = pcall(function()
+        return loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Rayfield/main/source.lua"))()
+    end)
+    if success and result then
+        Rayfield = result
+        print("Załadowano Rayfield z alternatywnego źródła.")
+    else
+        error("Nie udało się załadować Rayfield z żadnego źródła. Sprawdź połączenie.")
+    end
+end
+
+-- Sprawdzenie, czy Rayfield ma metodę SetConfiguration – jeśli nie, pomijamy
+if Rayfield.SetConfiguration then
+    Rayfield:SetConfiguration({
+        Name = "Polo Sniper Arena",
+        Saving = {
+            Enabled = true,
+            FolderName = "PoloSniperFinal",
+            FileName = "BestCheatsConfig"
+        },
+        Theme = {
+            Background = Color3.fromRGB(18, 18, 28),
+            SecondaryBackground = Color3.fromRGB(28, 28, 44),
+            Accent = Color3.fromRGB(255, 120, 50),
+            Font = Enum.Font.GothamBold,
+            TextColor = Color3.fromRGB(240, 240, 255),
+            ButtonColor = Color3.fromRGB(60, 60, 90),
+            ButtonHover = Color3.fromRGB(80, 80, 120),
+            Border = Color3.fromRGB(50, 50, 70)
+        }
+    })
+else
+    warn("Rayfield nie obsługuje SetConfiguration – używam domyślnych ustawień.")
+end
+
+-- ==================== TWORZENIE OKNA ====================
 local window = Rayfield:CreateWindow({
     Name = "Polo Sniper Arena",
     LoadingTitle = "Only Best Cheats",
-    LoadingSubtitle = "by polo & poprawione",
+    LoadingSubtitle = "by polo & logi",
     ConfigurationSaving = {
         Enabled = true,
         FolderName = "PoloSniperFinal",
@@ -15,7 +128,7 @@ local window = Rayfield:CreateWindow({
     }
 })
 
--- Zmienne stanu
+-- ==================== ZMIENNE STANU ====================
 local v2 = {
     Aimbot = false,
     AimbotSmooth = 1,
@@ -39,12 +152,13 @@ local v2 = {
     LootMethod = "Click"
 }
 
--- Zakładki
+-- ==================== ZAKŁADKI UI ====================
 local combatTab = window:CreateTab("🎯 COMBAT")
 local visualsTab = window:CreateTab("👁️ VISUALS")
 local weaponTab = window:CreateTab("🔫 WEAPON")
 local movementTab = window:CreateTab("🏃 MOVEMENT")
 local lootTab = window:CreateTab("🎁 LOOT")
+local logsTab = window:CreateTab("📋 LOGS")
 
 -- COMBAT
 combatTab:CreateToggle({
@@ -169,12 +283,14 @@ lootTab:CreateButton({
     Name = "🔍 Scan Remote Events",
     Callback = function()
         print("🔍 Skanowanie RemoteEvent/RemoteFunction...")
+        local found = 0
         for _, obj in pairs(game:GetDescendants()) do
             if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+                found = found + 1
                 print("📡", obj.Name, "→", obj.Parent and obj.Parent.Name or "brak rodzica")
             end
         end
-        print("✅ Skanowanie zakończone.")
+        print("✅ Znaleziono", found, "obiektów Remote.")
     end
 })
 lootTab:CreateButton({
@@ -208,7 +324,25 @@ lootTab:CreateButton({
     end
 })
 
--- Reszta skryptu (funkcje pomocnicze, pętla)
+-- LOGS (nowa zakładka)
+logsTab:CreateButton({
+    Name = "💾 Zapisz logi teraz",
+    Callback = function()
+        saveLogs()
+        print("✅ Logi zapisane do pliku:", logFile)
+    end
+})
+logsTab:CreateButton({
+    Name = "🧹 Wyczyść bufor logów",
+    Callback = function()
+        logBuffer = {}
+        print("🧹 Bufor logów wyczyszczony.")
+    end
+})
+logsTab:CreateLabel("📁 Logi zapisywane automatycznie co 30 sekund.")
+logsTab:CreateLabel("📄 Plik: " .. logFile .. " (w folderze executora)")
+
+-- ==================== RESZTA SKRYPTU (funkcje, pętla) ====================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -278,11 +412,13 @@ end
 local drawings = {}
 
 RunService.RenderStepped:Connect(function()
+    -- Czyszczenie rysunków
     for _, draw in pairs(drawings) do
         draw:Remove()
     end
     drawings = {}
 
+    -- Speed
     if v2.Speed and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
         local root = LocalPlayer.Character.HumanoidRootPart
@@ -293,6 +429,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
+    -- Jump, AutoStrafe
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
         local humanoid = LocalPlayer.Character.Humanoid
         if v2.Jump then
@@ -305,6 +442,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
+    -- ESP dla każdego gracza
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("HumanoidRootPart") then
             local char = player.Character
@@ -360,6 +498,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
+    -- Aimbot
     if v2.Aimbot and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
         local target = GetClosestEnemy()
         if target then
@@ -373,6 +512,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
+    -- TriggerBot
     if v2.TriggerBot then
         local target = Mouse.Target
         if target and target.Parent and target.Parent:FindFirstChild("Humanoid") then
@@ -380,10 +520,12 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
+    -- Modyfikacja broni
     if v2.NoRecoil or v2.NoSpread or v2.FastReload then
         ModifyWeapon()
     end
 
+    -- AUTO LOOT
     if v2.AutoLoot then
         pcall(function()
             if v2.LootMethod == "Click" then
@@ -409,11 +551,12 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- Powiadomienie
 Rayfield:Notify({
     Title = "Polo Sniper Arena",
-    Content = "Cheaty załadowane!",
+    Content = "Cheaty załadowane! Logi zapisywane do pliku.",
     Duration = 5,
     Image = 4483362850
 })
 
-print("✅ Skrypt uruchomiony! Miłej gry.")
+print("✅ Skrypt uruchomiony! Logi zapisywane do:", logFile)
