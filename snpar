@@ -301,29 +301,86 @@ lootTab:CreateButton({
     Name = "🧠 Check Loot Logic (Client/Server)",
     Callback = function()
         print("🔍 Sprawdzanie logiki skrzynek...")
-        local found = false
-        local clientScripts = {
-            game:GetService("StarterPlayer"):GetChildren(),
-            game:GetService("StarterGui"):GetChildren(),
-            game:GetService("Players").LocalPlayer.PlayerGui:GetChildren()
+
+        local function HasLootPattern(sourceText)
+            if not sourceText then return false end
+            local text = sourceText:lower()
+            local patterns = {
+                "open",
+                "loot",
+                "crate",
+                "reward",
+                "drop",
+                "rarity",
+                "chance",
+                "math.random",
+                "random.new",
+                "inventory",
+                "item",
+                "roll"
+            }
+            for _, pattern in ipairs(patterns) do
+                if text:find(pattern, 1, true) then
+                    return true
+                end
+            end
+            return false
+        end
+
+        local clientMatches = {}
+        local remoteMatches = {}
+        local containers = {
+            game:GetService("StarterPlayer"),
+            game:GetService("StarterGui"),
+            game:GetService("Players").LocalPlayer and game:GetService("Players").LocalPlayer.PlayerGui,
+            game:GetService("ReplicatedStorage"),
+            workspace
         }
-        for _, container in pairs(clientScripts) do
-            for _, script in pairs(container:GetDescendants()) do
-                if script:IsA("LocalScript") or script:IsA("ModuleScript") then
-                    local src = script:IsA("LocalScript") and script.Source or (script:IsA("ModuleScript") and script.Source)
-                    if src then
-                        if src:find("math%.random") or src:find("Luck") or src:find("Chance") then
-                            print("⚠️ Znaleziono potencjalną logikę kliencką w:", script:GetFullName())
-                            found = true
+
+        for _, container in ipairs(containers) do
+            if container then
+                for _, obj in ipairs(container:GetDescendants()) do
+                    if obj:IsA("LocalScript") or obj:IsA("ModuleScript") then
+                        local src = obj.Source
+                        if src and HasLootPattern(src) then
+                            table.insert(clientMatches, obj:GetFullName())
+                        end
+                    elseif obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+                        local name = (obj.Name or ""):lower()
+                        if name:find("open") or name:find("loot") or name:find("crate") or name:find("reward") or name:find("drop") then
+                            table.insert(remoteMatches, obj:GetFullName())
                         end
                     end
                 end
             end
         end
-        if not found then
-            print("✅ Nie znaleziono logiki klienckiej – prawdopodobnie logika jest po stronie serwera.")
+
+        if #clientMatches > 0 then
+            print("⚠️ Znaleziono potencjalną logikę kliencką:")
+            for _, match in ipairs(clientMatches) do
+                print("  - " .. match)
+            end
         else
-            print("⚠️ Logika może być po stronie klienta – możesz próbować modyfikować szanse.")
+            print("✅ Nie znaleziono oczywistej logiki klienckiej.")
+        end
+
+        if #remoteMatches > 0 then
+            print("📡 Znaleziono obiekty Remote związane z loot/drop:")
+            for _, match in ipairs(remoteMatches) do
+                print("  - " .. match)
+            end
+        else
+            print("📡 Brak widocznych Remote dla loot/drop.")
+        end
+
+        if #clientMatches > 0 and #remoteMatches > 0 then
+            print("🧠 Wniosek: istnieje zarówno logika klienta, jak i kanał sieciowy; to sugeruje częściowo zaufany flow klient-server.")
+        elseif #clientMatches > 0 then
+            print("🧠 Wniosek: logika najpewniej jest wspierana po stronie klienta, ale trzeba jeszcze sprawdzić, czy serwer nie waliduje wyniku.")
+        elseif #remoteMatches > 0 then
+            print("🧠 Wniosek: najpewniej logika jest po stronie serwera, bo otwarcie jest realizowane przez RemoteEvent/RemoteFunction.")
+        else
+            print("🧠 Wniosek: brak jednoznacznych sygnałów; do ostatecznej decyzji potrzebny jest bardziej szczegółowy skan serwera lub decompilacja.")
         end
     end
 })
@@ -366,23 +423,33 @@ end
 
 local function GetClosestEnemy()
     local closest, dist = nil, math.huge
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then
+        return nil
+    end
+
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
-            local visible = true
-            if v2.VisCheck then
-                local parts = Camera:GetPartsObscuringTarget(
-                    {player.Character.Head.Position},
-                    {LocalPlayer.Character, player.Character}
-                )
-                if #parts > 0 then visible = false end
-            end
-            if visible then
-                local pos, onScreen = Camera:WorldToViewportPoint(player.Character.Head.Position)
-                if onScreen then
-                    local d = (Vector2.new(pos.X, pos.Y) - UserInputService:GetMouseLocation()).Magnitude
-                    if d < dist then
-                        dist = d
-                        closest = player
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                local visible = true
+                if v2.VisCheck then
+                    local parts = Camera:GetPartsObscuringTarget(
+                        {player.Character.Head.Position},
+                        {char, player.Character}
+                    )
+                    if #parts > 0 then
+                        visible = false
+                    end
+                end
+                if visible then
+                    local pos, onScreen = Camera:WorldToViewportPoint(player.Character.Head.Position)
+                    if onScreen then
+                        local d = (Vector2.new(pos.X, pos.Y) - UserInputService:GetMouseLocation()).Magnitude
+                        if d < dist then
+                            dist = d
+                            closest = player
+                        end
                     end
                 end
             end
